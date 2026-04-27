@@ -1,0 +1,1239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ReelOS — GPT-4o Multi-Agent Competitive Intelligence Platform</title>
+    <!-- React & Babel CDNs -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/react-router-dom@6/umd/react-router-dom.production.min.js"></script>
+    <!-- Google Fonts -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap');
+
+        :root {
+            --bg: #070B10;
+            --surface: #0D1117;
+            --surfaceUp: #111820;
+            --border: #1A2535;
+            --borderGlow: rgba(0, 212, 255, 0.15);
+            --cyan: #00D4FF;
+            --green: #00FF9D;
+            --amber: #FFB800;
+            --purple: #A855F7;
+            --red: #FF4757;
+            --orange: #FF6B35;
+            --text: #DDE8FF;
+            --muted: #5A6A85;
+            --dim: #2A3A50;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            font-size: 11px;
+            background-image: 
+                radial-gradient(circle at 0% 0%, rgba(0, 212, 255, 0.05) 0%, transparent 50%),
+                radial-gradient(circle at 100% 100%, rgba(168, 85, 247, 0.05) 0%, transparent 50%);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 3px;
+            height: 3px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--muted);
+        }
+
+        /* Animations */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.25; }
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .fade-in { animation: fadeIn 0.3s ease forwards; }
+        .pulse { animation: pulse 2s infinite; }
+        .blink { animation: blink 1s infinite; }
+        .spin { animation: spin 1s linear infinite; display: inline-block; }
+
+        button:hover { filter: brightness(1.12); cursor: pointer; }
+        button:active { filter: brightness(0.9); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); }
+
+        textarea:focus, input:focus {
+            outline: none;
+            border-color: var(--cyan) !important;
+            box-shadow: 0 0 0 1px var(--borderGlow);
+        }
+
+        /* Utility Classes */
+        .glass {
+            background: rgba(13, 17, 23, 0.8);
+            backdrop-filter: blur(10px);
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useCallback, useMemo } = React;
+        const { HashRouter, Routes, Route, Link, useLocation, useNavigate, Navigate } = ReactRouterDOM;
+
+        // --- CONSTANTS ---
+        const AGENT_DEFS = [
+            {
+                id: "hook",
+                name: "Hook Intelligence Agent",
+                icon: "⚡",
+                color: "#00D4FF",
+                desc: "Reverse-engineers first-3-second hook patterns",
+                system_prompt: "You are the Hook Intelligence Agent — a specialist in analyzing Instagram Reel opening hooks. Analyze the provided reel URLs/transcripts and extract: 1. TOP HOOK FORMULAS (list the repeating hook structures you see) 2. HOOK CATEGORIES (curiosity / pain / contrarian / authority / story) 3. HOOK SWIPE BANK (5-8 reusable hook templates) 4. HOOK OPPORTUNITIES (2-3 underused hook angles in this niche) Format your response as valid JSON: { \"hookFormulas\": [], \"hookCategories\": { \"curiosity\": 0, \"pain\": 0, \"contrarian\": 0, \"authority\": 0, \"story\": 0 }, \"hookSwipeBank\": [], \"hookOpportunities\": [], \"topInsight\": \"\" }"
+            },
+            {
+                id: "retention",
+                name: "Retention Agent",
+                icon: "🔄",
+                color: "#00FF9D",
+                desc: "Detects open loops, pacing and payoff structures",
+                system_prompt: "You are the Retention Agent — a specialist in why viewers keep watching short-form video. Analyze the provided reel content and identify: 1. OPEN LOOP TECHNIQUES used 2. PATTERN INTERRUPTS detected 3. STORY PACING structures 4. PAYOFF TIMING patterns 5. RETENTION FORMULAS that repeat. Format as JSON: { \"openLoopTechniques\": [], \"patternInterrupts\": [], \"storyPacing\": [], \"retentionFormulas\": [], \"avgRetentionScore\": 0, \"topInsight\": \"\" }"
+            },
+            {
+                id: "gap",
+                name: "Topic Gap Agent",
+                icon: "🎯",
+                color: "#FFB800",
+                desc: "Finds underserved content whitespace",
+                system_prompt: "You are the Topic Gap Agent — a specialist in finding underserved content opportunities. Analyze the provided reel content and identify: 1. OVERSATURATED TOPICS (what everyone is covering) 2. CONTENT GAPS (what nobody is covering but audiences want) 3. BLUE OCEAN ANGLES (fresh takes on existing topics) 4. IGNORED PAIN POINTS (audience needs not being addressed). Format as JSON: { \"oversaturatedTopics\": [], \"contentGaps\": [], \"blueOceanAngles\": [], \"ignoredPainPoints\": [], \"gapOpportunityScore\": 0, \"topInsight\": \"\" }"
+            },
+            {
+                id: "pattern",
+                name: "Pattern Recognition Agent",
+                icon: "🧬",
+                color: "#A855F7",
+                desc: "Clusters viral story archetypes",
+                system_prompt: "You are the Pattern Recognition Agent — a specialist in detecting repeating viral content structures. Analyze the provided reel content and find: 1. FORMAT ARCHETYPES (story structures that repeat) 2. THEME CLUSTERS (topic groupings) 3. VIRALITY SIGNATURES (what highest-performing content has in common) 4. CONTENT FRAMEWORKS (repeating presentation methods). Format as JSON: { \"formatArchetypes\": [], \"themeClusters\": [], \"viralitySignatures\": [], \"contentFrameworks\": [], \"patternConfidence\": 0, \"topInsight\": \"\" }"
+            },
+            {
+                id: "competitor",
+                name: "Competitor Intelligence Agent",
+                icon: "🔍",
+                color: "#FF4757",
+                desc: "Maps growth patterns and positioning gaps",
+                system_prompt: "You are the Competitor Intelligence Agent — a specialist in competitive content analysis. Analyze the provided competitor reel content and identify: 1. POSITIONING DIFFERENCES between top and emerging creators 2. FORMAT ADVANTAGES certain creators have 3. GROWTH PATTERN SIGNALS (what's working for growing accounts) 4. COMPETITIVE GAPS (where established creators are weak). Format as JSON: { \"positioningDifferences\": [], \"formatAdvantages\": [], \"growthPatternSignals\": [], \"competitiveGaps\": [], \"competitiveScore\": 0, \"topInsight\": \"\" }"
+            },
+            {
+                id: "strategy",
+                name: "Content Strategy Agent",
+                icon: "🚀",
+                color: "#FF6B35",
+                desc: "Converts all research into 30 client reel concepts",
+                system_prompt: "You are the Content Strategy Agent — you synthesize all research into actionable reel concepts. Based on the research insights provided, generate exactly 5 high-priority reel concepts. Each concept must have a strong hook, clear angle, content bucket, and viral probability score. Format as JSON: { \"reelConcepts\": [ { \"id\": 1, \"hook\": \"\", \"angle\": \"\", \"bucket\": \"\", \"viralProbability\": 0, \"outline\": \"\", \"cta\": \"\" } ], \"contentPillars\": [], \"seriesConcepts\": [], \"topInsight\": \"\" }"
+            }
+        ];
+
+        const NAV_ITEMS = [
+            { id: 'dashboard', label: 'Dashboard', icon: '◈', path: '/' },
+            { id: 'input', label: 'Reel Input', icon: '⊞', path: '/input' },
+            { id: 'agents', label: 'Agent Center', icon: '◎', path: '/agents' },
+            { id: 'insights', label: 'Insights Board', icon: '∿', path: '/insights' },
+            { id: 'recommendations', label: '30 Reel Ideas', icon: '✦', path: '/recommendations' },
+            { id: 'export', label: 'Export', icon: '↗', path: '/export' }
+        ];
+
+        // --- COMPONENTS ---
+
+        const Badge = ({ children, color = '#5A6A85', style = {} }) => (
+            <span style={{
+                color: color,
+                backgroundColor: `${color}1A`,
+                border: `1px solid ${color}33`,
+                borderRadius: '4px',
+                padding: '2px 8px',
+                fontSize: '9px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.12em',
+                fontWeight: 600,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                ...style
+            }}>
+                {children}
+            </span>
+        );
+
+        const Dot = ({ color = '#5A6A85', pulse = false, size = '7px' }) => (
+            <div className={pulse ? 'pulse' : ''} style={{
+                width: size,
+                height: size,
+                borderRadius: '50%',
+                backgroundColor: color,
+                boxShadow: pulse ? `0 0 8px ${color}` : 'none'
+            }} />
+        );
+
+        const Row = ({ children, gap = '10px', align = 'center', justify = 'flex-start', style = {} }) => (
+            <div style={{
+                display: 'flex',
+                alignItems: align,
+                justifyContent: justify,
+                gap: gap,
+                ...style
+            }}>
+                {children}
+            </div>
+        );
+
+        const Label = ({ children, style = {} }) => (
+            <div style={{
+                fontSize: '9px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.2em',
+                color: 'var(--muted)',
+                marginBottom: '5px',
+                fontWeight: 500,
+                ...style
+            }}>
+                {children}
+            </div>
+        );
+
+        const Btn = ({ children, color = 'var(--cyan)', ghost = false, onClick, style = {}, disabled = false, loading = false }) => {
+            const baseStyle = {
+                borderRadius: '5px',
+                padding: '7px 14px',
+                fontSize: '10px',
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+                fontWeight: 600,
+                transition: 'all 0.15s',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                border: ghost ? `1px solid ${color}` : 'none',
+                background: ghost ? 'transparent' : color,
+                color: ghost ? color : 'var(--bg)',
+                ...style
+            };
+
+            return (
+                <button style={baseStyle} onClick={onClick} disabled={disabled || loading}>
+                    {loading && <span className="spin">◌</span>}
+                    {children}
+                </button>
+            );
+        };
+
+        const Card = ({ children, style = {}, glow = false }) => (
+            <div style={{
+                backgroundColor: 'var(--surface)',
+                border: `1px solid ${glow ? 'var(--cyan)33' : 'var(--border)'}`,
+                borderRadius: '8px',
+                padding: '18px',
+                boxShadow: glow ? '0 0 20px var(--borderGlow)' : 'none',
+                ...style
+            }}>
+                {children}
+            </div>
+        );
+
+        const Pbar = ({ pct = 0, color = 'var(--cyan)', glow = true }) => (
+            <div style={{
+                height: '3px',
+                background: 'var(--border)',
+                borderRadius: '2px',
+                overflow: 'hidden',
+                width: '100%'
+            }}>
+                <div style={{
+                    height: '100%',
+                    width: `${Math.min(pct, 100)}%`,
+                    background: color,
+                    boxShadow: glow ? `0 0 8px ${color}` : 'none',
+                    transition: 'width 0.6s ease'
+                }} />
+            </div>
+        );
+
+        // --- SCREENS ---
+
+        const ApiKeyGate = ({ onKey }) => {
+            const [key, setKey] = useState('');
+            const [error, setError] = useState('');
+            const [loading, setLoading] = useState(false);
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                if (!key.startsWith('sk-')) {
+                    setError('Invalid key format. Must start with sk-');
+                    return;
+                }
+                setLoading(true);
+                setError('');
+                try {
+                    const res = await fetch('https://api.openai.com/v1/models', {
+                        headers: { 'Authorization': `Bearer ${key}` }
+                    });
+                    if (res.ok) {
+                        onKey(key);
+                    } else {
+                        const errData = await res.json();
+                        setError(errData.error?.message || 'Invalid API key — check and retry');
+                    }
+                } catch (err) {
+                    setError('Network error. Check your connection.');
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            return (
+                <div style={{
+                    height: '100vh',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: 'var(--bg)'
+                }}>
+                    <Card style={{ width: '400px', textAlign: 'center' }} glow>
+                        <div style={{ fontSize: '32px', marginBottom: '10px' }}>⚡</div>
+                        <h1 style={{ fontSize: '22px', marginBottom: '5px', fontWeight: 700 }}>ReelOS</h1>
+                        <Label style={{ marginBottom: '20px' }}>GPT-4o Multi-Agent Platform</Label>
+                        
+                        <form onSubmit={handleSubmit}>
+                            <input
+                                type="password"
+                                placeholder="Paste OpenAI API Key (sk-...)"
+                                value={key}
+                                onChange={(e) => setKey(e.target.value)}
+                                style={{
+                                    width: '100%',
+                                    background: 'var(--bg)',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: '6px',
+                                    padding: '12px',
+                                    color: 'var(--text)',
+                                    fontSize: '12px',
+                                    marginBottom: '15px'
+                                }}
+                            />
+                            {error && <div style={{ color: 'var(--red)', fontSize: '10px', marginBottom: '15px' }}>⚠ {error}</div>}
+                            <Btn loading={loading} style={{ width: '100%' }}>Connect Platform</Btn>
+                        </form>
+                        
+                        <div style={{ marginTop: '20px', color: 'var(--muted)', fontSize: '10px' }}>
+                            Privacy: Your key stays in your browser's memory only.
+                        </div>
+                    </Card>
+                </div>
+            );
+        };
+
+        const Sidebar = ({ reelCount, doneCount }) => {
+            const location = useLocation();
+            
+            return (
+                <div style={{
+                    width: '240px',
+                    height: '100vh',
+                    borderRight: '1px solid var(--border)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    padding: '20px 0',
+                    background: 'rgba(13, 17, 23, 0.4)'
+                }}>
+                    <div style={{ padding: '0 20px', marginBottom: '30px' }}>
+                        <Row gap="8px">
+                            <div style={{ color: 'var(--cyan)', fontSize: '18px' }}>⚡</div>
+                            <div style={{ fontWeight: 700, fontSize: '15px', letterSpacing: '-0.5px' }}>ReelOS <span style={{ color: 'var(--muted)', fontWeight: 300 }}>2.0</span></div>
+                        </Row>
+                    </div>
+
+                    <div style={{ flex: 1 }}>
+                        {NAV_ITEMS.map(item => (
+                            <Link
+                                key={item.id}
+                                to={item.path}
+                                style={{
+                                    padding: '10px 20px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '12px',
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                    textDecoration: 'none',
+                                    color: location.pathname === item.path ? 'var(--cyan)' : 'var(--muted)',
+                                    borderLeft: location.pathname === item.path ? '2px solid var(--cyan)' : '2px solid transparent',
+                                    background: location.pathname === item.path ? 'var(--borderGlow)' : 'transparent',
+                                    transition: 'all 0.15s'
+                                }}
+                            >
+                                <span>{item.icon}</span>
+                                <span>{item.label}</span>
+                            </Link>
+                        ))}
+                    </div>
+
+                    <div style={{ padding: '20px', borderTop: '1px solid var(--border)' }}>
+                        <div style={{ marginBottom: '15px' }}>
+                            <Label>Context Status</Label>
+                            <Row justify="space-between" style={{ marginTop: '5px' }}>
+                                <span style={{ color: 'var(--muted)' }}>Lines loaded</span>
+                                <span style={{ color: reelCount > 0 ? 'var(--cyan)' : 'var(--muted)' }}>{reelCount}</span>
+                            </Row>
+                            <Row justify="space-between" style={{ marginTop: '5px' }}>
+                                <span style={{ color: 'var(--muted)' }}>Agents Done</span>
+                                <span style={{ color: doneCount === 6 ? 'var(--green)' : 'var(--muted)' }}>{doneCount}/6</span>
+                            </Row>
+                        </div>
+                        <Badge color="var(--green)">
+                            <Dot color="var(--green)" pulse /> GPT-4o Connected
+                        </Badge>
+                    </div>
+                </div>
+            );
+        };
+
+        const Topbar = ({ reelCount, doneCount, onDisconnect }) => {
+            const location = useLocation();
+            const currentPageName = NAV_ITEMS.find(n => n.path === location.pathname)?.label || 'System';
+
+            return (
+                <div className="glass" style={{
+                    height: '50px',
+                    borderBottom: '1px solid var(--border)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '0 25px',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 10
+                }}>
+                    <Row gap="15px">
+                        <Dot color="var(--green)" pulse />
+                        <span style={{ textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 600 }}>{currentPageName}</span>
+                    </Row>
+                    
+                    <Row gap="15px">
+                        {reelCount > 0 && <Badge color="var(--cyan)">{reelCount} Lines</Badge>}
+                        {doneCount > 0 && <Badge color="var(--purple)">{doneCount}/6 Agents</Badge>}
+                        <button 
+                            onClick={onDisconnect}
+                            style={{
+                                background: 'none',
+                                border: 'none',
+                                color: 'var(--muted)',
+                                fontSize: '14px',
+                                cursor: 'pointer'
+                            }}
+                            title="Disconnect API Key"
+                        >
+                            ⏻
+                        </button>
+                    </Row>
+                </div>
+            );
+        };
+
+        // --- APP MAIN ---
+
+        const MainLayout = ({ apiKey, setApiKey, reelInput, setReelInput, agentStates, setAgentStates }) => {
+            const navigate = useNavigate();
+            const location = useLocation();
+
+            const reelCount = useMemo(() => reelInput.split('\n').filter(l => l.trim()).length, [reelInput]);
+            const doneCount = useMemo(() => Object.values(agentStates).filter(s => s.state === 'done').length, [agentStates]);
+
+            const handleDisconnect = () => {
+                if (confirm('Disconnect API key and clear session?')) {
+                    setApiKey('');
+                    setAgentStates({});
+                    navigate('/');
+                }
+            };
+
+            return (
+                <div style={{ display: 'flex', height: '100vh' }}>
+                    <Sidebar reelCount={reelCount} doneCount={doneCount} />
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
+                        <Topbar reelCount={reelCount} doneCount={doneCount} onDisconnect={handleDisconnect} />
+                        
+                        <main style={{ flex: 1, overflowY: 'auto', padding: '30px' }}>
+                            <div key={location.pathname} className="fade-in">
+                                <Routes>
+                                    <Route path="/" element={<Dashboard reelInput={reelInput} agentStates={agentStates} />} />
+                                    <Route path="/input" element={<ReelInput reelInput={reelInput} setReelInput={setReelInput} />} />
+                                    <Route path="/agents" element={<AgentWorkspace apiKey={apiKey} reelInput={reelInput} agentStates={agentStates} setAgentStates={setAgentStates} />} />
+                                    <Route path="/insights" element={<InsightsBoard agentStates={agentStates} />} />
+                                    <Route path="/recommendations" element={<Recommendations agentStates={agentStates} />} />
+                                    <Route path="/export" element={<Export reelInput={reelInput} agentStates={agentStates} />} />
+                                </Routes>
+                            </div>
+                        </main>
+                    </div>
+                </div>
+            );
+        };
+
+        const App = () => {
+            const [apiKey, setApiKey] = useState('');
+            const [reelInput, setReelInput] = useState('');
+            const [agentStates, setAgentStates] = useState({});
+
+            if (!apiKey) return <ApiKeyGate onKey={setApiKey} />;
+
+            return (
+                <HashRouter>
+                    <MainLayout 
+                        apiKey={apiKey} 
+                        setApiKey={setApiKey}
+                        reelInput={reelInput}
+                        setReelInput={setReelInput}
+                        agentStates={agentStates}
+                        setAgentStates={setAgentStates}
+                    />
+                </HashRouter>
+            );
+        };
+
+        // --- SCREEN COMPONENTS ---
+
+        const Dashboard = ({ reelInput, agentStates }) => {
+            const navigate = useNavigate();
+            const reelCount = reelInput.split('\n').filter(l => l.trim()).length;
+            const doneCount = Object.values(agentStates).filter(s => s.state === 'done').length;
+
+            return (
+                <div>
+                    <Card glow style={{ marginBottom: '25px', background: 'linear-gradient(135deg, #0D1117 0%, #091525 100%)', border: '1px solid var(--cyan)44' }}>
+                        <Label>ReelOS · Multi-Agent Competitive Intelligence</Label>
+                        <h1 style={{ fontSize: '24px', margin: '15px 0', fontWeight: 800, letterSpacing: '-0.02em', fontFamily: 'Outfit, sans-serif' }}>100 Reel AI Research Engine</h1>
+                        <p style={{ color: 'var(--muted)', maxWidth: '600px', lineHeight: '1.6', marginBottom: '25px', fontSize: '13px' }}>
+                            Paste competitor reel URLs + context → 6 GPT-4o specialist agents analyze → detect viral patterns → generate 30 client-ready content strategies.
+                        </p>
+                        <Row gap="15px">
+                            <Btn onClick={() => navigate('/input')} style={{ padding: '10px 20px', fontSize: '11px' }}>⊞ Add Reels</Btn>
+                            <Btn ghost onClick={() => navigate('/agents')} style={{ padding: '10px 20px', fontSize: '11px' }}>◎ Launch Agents</Btn>
+                        </Row>
+                    </Card>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '25px' }}>
+                        <Card>
+                            <Label>Reels in context</Label>
+                            <div style={{ fontSize: '28px', fontWeight: 700, margin: '10px 0', color: 'var(--cyan)' }}>{reelCount}</div>
+                            <Pbar pct={Math.min(reelCount * 2, 100)} color="var(--cyan)" />
+                        </Card>
+                        <Card>
+                            <Label>Agents complete</Label>
+                            <div style={{ fontSize: '28px', fontWeight: 700, margin: '10px 0', color: 'var(--green)' }}>{doneCount}/6</div>
+                            <Pbar pct={(doneCount / 6) * 100} color="var(--green)" />
+                        </Card>
+                        <Card>
+                            <Label>Pipeline progress</Label>
+                            <div style={{ fontSize: '28px', fontWeight: 700, margin: '10px 0', color: 'var(--purple)' }}>{Math.round((doneCount / 6) * 100)}%</div>
+                            <Pbar pct={(doneCount / 6) * 100} color="var(--purple)" />
+                        </Card>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '20px' }}>
+                        <Card>
+                            <Label style={{ marginBottom: '20px' }}>Research Workflow Checklist</Label>
+                            {[
+                                { label: 'Add reel URLs / context', done: reelCount > 0 },
+                                { label: 'Run Hook Intelligence Agent', done: agentStates.hook?.state === 'done' },
+                                { label: 'Run Retention + Gap Agents', done: agentStates.retention?.state === 'done' && agentStates.gap?.state === 'done' },
+                                { label: 'Run Pattern + Competitor Agents', done: agentStates.pattern?.state === 'done' && agentStates.competitor?.state === 'done' },
+                                { label: 'Run Strategy Agent', done: agentStates.strategy?.state === 'done' },
+                                { label: 'Export 30 reel concepts', done: doneCount === 6 }
+                            ].map((step, i) => (
+                                <Row key={i} gap="15px" style={{ marginBottom: '15px', opacity: step.done ? 1 : 0.4, transition: 'opacity 0.3s' }}>
+                                    <div style={{
+                                        width: '22px', height: '22px', borderRadius: '50%',
+                                        background: step.done ? 'var(--green)' : 'var(--dim)',
+                                        color: step.done ? 'var(--bg)' : 'var(--muted)',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700
+                                    }}>
+                                        {step.done ? '✓' : i + 1}
+                                    </div>
+                                    <span style={{ color: step.done ? 'var(--text)' : 'var(--muted)', fontSize: '12px' }}>{step.label}</span>
+                                </Row>
+                            ))}
+                        </Card>
+
+                        <Card>
+                            <Label style={{ marginBottom: '20px' }}>Real-time Agent Monitoring</Label>
+                            {AGENT_DEFS.map(agent => {
+                                const state = agentStates[agent.id]?.state || 'idle';
+                                const color = state === 'done' ? 'var(--green)' : state === 'running' ? 'var(--amber)' : 'var(--dim)';
+                                const label = state === 'done' ? 'DONE' : state === 'running' ? 'LIVE' : 'IDLE';
+                                return (
+                                    <Row key={agent.id} justify="space-between" style={{ marginBottom: '14px', padding: '8px 12px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px' }}>
+                                        <Row gap="10px">
+                                            <span style={{ color: agent.color }}>{agent.icon}</span>
+                                            <span style={{ fontWeight: 500 }}>{agent.name.split(' ')[0]} Intelligence</span>
+                                        </Row>
+                                        <Badge color={color}>{label}</Badge>
+                                    </Row>
+                                );
+                            })}
+                        </Card>
+                    </div>
+                </div>
+            );
+        };
+
+        const ReelInput = ({ reelInput, setReelInput }) => {
+            const lineCount = reelInput.split('\n').filter(l => l.trim()).length;
+            
+            return (
+                <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                    <Card style={{ marginBottom: '20px', border: '1px solid var(--border)' }}>
+                        <Label>Research Context & Data Input</Label>
+                        <p style={{ color: 'var(--muted)', lineHeight: '1.5', fontSize: '12px' }}>
+                            Paste Instagram Reel URLs, transcripts, and niche context. Every line increases agent precision.
+                        </p>
+                    </Card>
+
+                    <div style={{ flex: 1, position: 'relative' }}>
+                        <textarea
+                            placeholder="https://www.instagram.com/reel/abc123...&#10;&#10;Niche: Personal Finance&#10;Competitor: @moneywithjohn&#10;&#10;Transcripts:&#10;[Reel 1]: 'Nobody talks about...'"
+                            value={reelInput}
+                            onChange={(e) => setReelInput(e.target.value)}
+                            style={{
+                                width: '100%',
+                                height: '100%',
+                                background: 'var(--surfaceUp)',
+                                border: '1px solid var(--border)',
+                                borderRadius: '12px',
+                                padding: '25px',
+                                color: 'var(--text)',
+                                fontSize: '13px',
+                                resize: 'none',
+                                lineHeight: '1.7',
+                                boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.2)'
+                            }}
+                        />
+                        <div style={{ position: 'absolute', bottom: '25px', right: '25px', display: 'flex', gap: '12px' }}>
+                            <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 12px', color: 'var(--cyan)', fontSize: '10px', fontWeight: 700 }}>
+                                {lineCount} DATA POINTS LOADED
+                            </div>
+                            <Btn color="var(--red)" ghost onClick={() => setReelInput('')}>Reset Input</Btn>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const AgentCard = ({ agent, state, onRun, apiKey, reelInput }) => {
+            const [streamText, setStreamText] = useState('');
+            const [error, setErr] = useState('');
+            const status = state?.state || 'idle';
+            const terminalRef = useRef(null);
+
+            useEffect(() => {
+                if (terminalRef.current) {
+                    terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
+                }
+            }, [streamText]);
+
+            const runAgent = async () => {
+                if (status === 'running' || !apiKey || !reelInput) return;
+                
+                onRun(agent.id, 'running');
+                setStreamText('');
+                setErr('');
+                
+                try {
+                    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${apiKey}`
+                        },
+                        body: JSON.stringify({
+                            model: 'gpt-4o',
+                            stream: true,
+                            temperature: 0.7,
+                            max_tokens: 1200,
+                            messages: [
+                                { role: 'system', content: agent.system_prompt },
+                                { role: 'user', content: `Analyze these Instagram reels and their context:\n\n${reelInput}\n\nProvide your specialist analysis as valid JSON only.` }
+                            ]
+                        })
+                    });
+
+                    if (!response.ok) {
+                        const errData = await response.json();
+                        throw new Error(errData.error?.message || 'OpenAI API error');
+                    }
+
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder();
+                    let fullContent = '';
+
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+
+                        const chunk = decoder.decode(value);
+                        const lines = chunk.split('\n');
+                        
+                        for (const line of lines) {
+                            if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+                                try {
+                                    const data = JSON.parse(line.slice(6));
+                                    const content = data.choices[0].delta?.content || '';
+                                    fullContent += content;
+                                    setStreamText(fullContent);
+                                } catch (e) {}
+                            }
+                        }
+                    }
+
+                    try {
+                        const jsonMatch = fullContent.match(/\{[\s\S]*\}/);
+                        if (jsonMatch) {
+                            const parsed = JSON.parse(jsonMatch[0]);
+                            onRun(agent.id, 'done', parsed);
+                        } else {
+                            throw new Error("Invalid output format");
+                        }
+                    } catch (e) {
+                        onRun(agent.id, 'error');
+                        setErr("JSON Parsing Failed");
+                    }
+
+                } catch (e) {
+                    setErr(e.message);
+                    onRun(agent.id, 'error');
+                }
+            };
+
+            useEffect(() => {
+                const handleRunEvent = (e) => {
+                    if (e.detail.agentId === agent.id) runAgent();
+                };
+                window.addEventListener('runAgent', handleRunEvent);
+                return () => window.removeEventListener('runAgent', handleRunEvent);
+            }, [apiKey, reelInput, status]);
+
+            return (
+                <Card style={{
+                    border: status === 'running' ? `1px solid ${agent.color}88` : status === 'done' ? `1px solid ${agent.color}33` : '1px solid var(--border)',
+                    background: status === 'running' ? `${agent.color}08` : 'var(--surfaceUp)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    minHeight: '300px',
+                    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                    position: 'relative',
+                    overflow: 'hidden'
+                }}>
+                    <Row justify="space-between" style={{ marginBottom: '20px' }}>
+                        <Row gap="12px">
+                            <div style={{ 
+                                width: '36px', height: '36px', borderRadius: '8px', 
+                                background: `${agent.color}15`, border: `1px solid ${agent.color}33`,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px'
+                            }}>
+                                {agent.icon}
+                            </div>
+                            <div>
+                                <div style={{ fontWeight: 700, fontSize: '13px' }}>{agent.name}</div>
+                                <div style={{ fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Specialist Agent</div>
+                            </div>
+                        </Row>
+                        <Badge color={status === 'done' ? 'var(--green)' : status === 'running' ? 'var(--amber)' : 'var(--dim)'}>
+                            {status === 'done' ? 'COMPLETE' : status === 'running' ? 'STREAMING' : 'IDLE'}
+                        </Badge>
+                    </Row>
+
+                    {status === 'idle' && (
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                            <p style={{ fontSize: '11px', color: 'var(--muted)', marginBottom: '25px', lineHeight: '1.6' }}>{agent.desc}</p>
+                            <Btn ghost color={agent.color} onClick={runAgent} disabled={!reelInput} style={{ marginTop: 'auto', width: '100%' }}>
+                                Initialize Analysis
+                            </Btn>
+                        </div>
+                    )}
+
+                    {status === 'running' && (
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                            <div ref={terminalRef} style={{
+                                flex: 1,
+                                background: 'rgba(0,0,0,0.3)',
+                                borderRadius: '6px',
+                                padding: '12px',
+                                fontSize: '10px',
+                                color: 'var(--muted)',
+                                overflowY: 'auto',
+                                fontFamily: 'monospace',
+                                border: `1px solid ${agent.color}22`,
+                                marginBottom: '15px'
+                            }}>
+                                {streamText}
+                                <span className="blink" style={{ color: agent.color }}>█</span>
+                            </div>
+                            <Row gap="8px" style={{ color: 'var(--amber)', fontSize: '10px', fontWeight: 600 }}>
+                                <span className="spin">◌</span> PROCESSING STREAM VIA GPT-4o...
+                            </Row>
+                        </div>
+                    )}
+
+                    {status === 'done' && (
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                            <div style={{
+                                background: `${agent.color}10`,
+                                borderLeft: `3px solid ${agent.color}`,
+                                padding: '15px',
+                                marginBottom: '20px',
+                                color: 'var(--text)',
+                                fontSize: '12px',
+                                fontStyle: 'italic',
+                                lineHeight: '1.5'
+                            }}>
+                                "{state.data?.topInsight || "Analysis successfully synthesized."}"
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
+                                {Object.entries(state.data || {}).filter(([k]) => Array.isArray(state.data[k])).slice(0, 2).map(([key, val]) => (
+                                    <div key={key}>
+                                        <Label style={{ fontSize: '8px', color: agent.color }}>{key}</Label>
+                                        <div style={{ color: 'var(--muted)', fontSize: '10px' }}>
+                                            {val.slice(0, 3).map((item, i) => <div key={i} style={{ marginBottom: '4px' }}>→ {String(item).substring(0, 40)}...</div>)}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            <Btn ghost color={agent.color} onClick={runAgent} style={{ marginTop: 'auto' }}>↺ Regenerate Report</Btn>
+                        </div>
+                    )}
+
+                    {status === 'error' && (
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                            <div style={{ color: 'var(--red)', fontSize: '11px', marginBottom: '20px', background: 'rgba(255,71,87,0.1)', padding: '10px', borderRadius: '6px' }}>⚠ {error}</div>
+                            <Btn ghost color="var(--red)" onClick={runAgent} style={{ marginTop: 'auto' }}>Retry System Call</Btn>
+                        </div>
+                    )}
+                </Card>
+            );
+        };
+
+        const AgentWorkspace = ({ apiKey, reelInput, agentStates, setAgentStates }) => {
+            const onRun = (id, state, data = null) => {
+                setAgentStates(prev => ({
+                    ...prev,
+                    [id]: { state, data: data || prev[id]?.data }
+                }));
+            };
+
+            const runAll = () => {
+                AGENT_DEFS.forEach((agent, i) => {
+                    setTimeout(() => {
+                        window.dispatchEvent(new CustomEvent('runAgent', { detail: { agentId: agent.id } }));
+                    }, i * 300);
+                });
+            };
+
+            const doneCount = Object.values(agentStates).filter(s => s.state === 'done').length;
+
+            return (
+                <div>
+                    <Row justify="space-between" style={{ marginBottom: '30px' }}>
+                        <div>
+                            <Label>Multi-Agent Execution</Label>
+                            <h1 style={{ fontSize: '24px', fontWeight: 800 }}>Agent Command Center</h1>
+                        </div>
+                        <Row gap="15px">
+                            <div style={{ textAlign: 'right' }}>
+                                <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--purple)' }}>{doneCount}/6</div>
+                                <div style={{ fontSize: '9px', color: 'var(--muted)' }}>AGENTS READY</div>
+                            </div>
+                            <Btn onClick={runAll} disabled={!reelInput} style={{ background: 'var(--purple)', color: 'white' }}>◎ Parallel Execution</Btn>
+                        </Row>
+                    </Row>
+
+                    <div style={{ marginBottom: '30px' }}>
+                        <Pbar pct={(doneCount / 6) * 100} color="var(--purple)" />
+                        {!reelInput && <div style={{ color: 'var(--red)', fontSize: '10px', marginTop: '10px', fontWeight: 600 }}>⚠ ANALYSIS BLOCKED: Please provide reel input data first.</div>}
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '25px' }}>
+                        {AGENT_DEFS.map(agent => (
+                            <AgentCard
+                                key={agent.id}
+                                agent={agent}
+                                state={agentStates[agent.id]}
+                                onRun={onRun}
+                                apiKey={apiKey}
+                                reelInput={reelInput}
+                            />
+                        ))}
+                    </div>
+
+                    {doneCount >= 3 && (
+                        <div className="fade-in" style={{ marginTop: '40px' }}>
+                            <Card style={{ 
+                                border: '1px solid var(--purple)66', 
+                                background: 'linear-gradient(90deg, rgba(168, 85, 247, 0.05) 0%, transparent 100%)',
+                                position: 'relative',
+                                overflow: 'hidden'
+                            }}>
+                                <div style={{ position: 'absolute', top: 0, right: 0, width: '100px', height: '100%', background: 'linear-gradient(90deg, transparent, rgba(168, 85, 247, 0.1))' }} />
+                                <Row gap="20px">
+                                    <div style={{ fontSize: '32px' }}>🧬</div>
+                                    <div>
+                                        <h3 style={{ fontSize: '16px', marginBottom: '6px', fontWeight: 700 }}>Synthesis Engine Online</h3>
+                                        <p style={{ color: 'var(--muted)', fontSize: '12px', maxWidth: '600px' }}>Sufficient data captured for cross-agent intelligence. Aggregated insights and strategic recommendations are now being compiled in the Insights Board.</p>
+                                    </div>
+                                    <Btn ghost color="var(--purple)" style={{ marginLeft: 'auto' }} onClick={() => window.location.hash = '#/insights'}>View Merged Insights</Btn>
+                                </Row>
+                            </Card>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const InsightsBoard = ({ agentStates }) => {
+            const doneAgents = AGENT_DEFS.filter(a => agentStates[a.id]?.state === 'done');
+
+            if (doneAgents.length === 0) {
+                return (
+                    <div style={{ height: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+                        <div>
+                            <div style={{ fontSize: '64px', color: 'var(--dim)', marginBottom: '20px' }}>∿</div>
+                            <h2 style={{ fontSize: '20px', marginBottom: '10px' }}>System Idle</h2>
+                            <p style={{ color: 'var(--muted)', fontSize: '13px' }}>Run agents in the Command Center to populate this board with intelligence.</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '25px' }}>
+                    {doneAgents.map(agent => {
+                        const data = agentStates[agent.id].data;
+                        return (
+                            <Card key={agent.id} style={{ border: `1px solid ${agent.color}44`, boxShadow: `0 10px 30px -10px ${agent.color}22` }}>
+                                <Row justify="space-between" style={{ marginBottom: '20px' }}>
+                                    <Row gap="12px">
+                                        <span style={{ fontSize: '20px', color: agent.color }}>{agent.icon}</span>
+                                        <span style={{ fontWeight: 800, color: agent.color, fontSize: '14px', letterSpacing: '0.05em' }}>{agent.name.toUpperCase()}</span>
+                                    </Row>
+                                    <Badge color="var(--green)">✓ AI VERIFIED</Badge>
+                                </Row>
+
+                                <div style={{
+                                    background: `${agent.color}15`,
+                                    borderLeft: `4px solid ${agent.color}`,
+                                    padding: '18px',
+                                    marginBottom: '25px',
+                                    fontSize: '13px',
+                                    lineHeight: '1.6',
+                                    borderRadius: '0 8px 8px 0',
+                                    color: 'var(--text)'
+                                }}>
+                                    {data.topInsight}
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                                    {Object.entries(data).filter(([k]) => k !== 'topInsight' && !k.toLowerCase().includes('score')).map(([key, val]) => (
+                                        <div key={key}>
+                                            <Label style={{ fontSize: '9px', color: agent.color, marginBottom: '10px' }}>{key.replace(/([A-Z])/g, ' $1')}</Label>
+                                            <div style={{ fontSize: '11px' }}>
+                                                {Array.isArray(val) ? (
+                                                    val.slice(0, 3).map((item, i) => (
+                                                        <div key={i} style={{ marginBottom: '8px', color: 'var(--muted)', lineHeight: '1.4' }}>
+                                                            <span style={{ color: agent.color, marginRight: '6px' }}>•</span>{String(item)}
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    typeof val === 'object' ? (
+                                                        Object.entries(val).map(([k, v]) => (
+                                                            <Row key={k} justify="space-between" style={{ marginBottom: '6px', paddingBottom: '6px', borderBottom: '1px solid var(--border)' }}>
+                                                                <span style={{ color: 'var(--muted)' }}>{k}</span>
+                                                                <span style={{ color: 'var(--text)', fontWeight: 700 }}>{v}</span>
+                                                            </Row>
+                                                        ))
+                                                    ) : <span style={{ color: 'var(--text)' }}>{val}</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {Object.entries(data).filter(([k]) => k.toLowerCase().includes('score') || k.toLowerCase().includes('confidence')).map(([key, val]) => (
+                                        <div key={key} style={{ gridColumn: 'span 2', marginTop: '10px' }}>
+                                            <Row justify="space-between" style={{ marginBottom: '8px' }}>
+                                                <Label style={{ fontSize: '9px' }}>{key}</Label>
+                                                <span style={{ color: agent.color, fontWeight: 800, fontSize: '14px' }}>{val}%</span>
+                                            </Row>
+                                            <Pbar pct={val} color={agent.color} />
+                                        </div>
+                                    ))}
+                                </div>
+                            </Card>
+                        );
+                    })}
+                </div>
+            );
+        };
+
+        const Recommendations = ({ agentStates }) => {
+            const stratData = agentStates.strategy?.data;
+
+            if (!stratData) {
+                return (
+                    <div style={{ height: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+                        <div>
+                            <div style={{ fontSize: '64px', color: 'var(--dim)', marginBottom: '20px' }}>✦</div>
+                            <h2 style={{ fontSize: '20px', marginBottom: '10px' }}>Strategy Engine Offline</h2>
+                            <p style={{ color: 'var(--muted)', fontSize: '13px' }}>The Strategy Agent must complete analysis before recommendations can be generated.</p>
+                            <Btn style={{ marginTop: '20px', marginInline: 'auto' }} onClick={() => window.location.hash = '#/agents'}>Launch Strategy Agent</Btn>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div>
+                    <Row justify="space-between" style={{ marginBottom: '35px' }}>
+                        <div>
+                            <Label>AI-Generated Creative</Label>
+                            <h1 style={{ fontSize: '28px', fontWeight: 800, fontFamily: 'Outfit, sans-serif' }}>30 Reel Strategy Concepts</h1>
+                        </div>
+                        <Row gap="15px">
+                            <Badge color="var(--green)" style={{ padding: '6px 12px', fontSize: '11px' }}>{stratData.reelConcepts?.length || 0} OPTIMIZED CONCEPTS</Badge>
+                            <Btn ghost onClick={() => {
+                                const blob = new Blob([JSON.stringify(stratData, null, 2)], { type: 'application/json' });
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = 'ReelOS-Recommendations.json';
+                                a.click();
+                            }}>↗ Export Assets</Btn>
+                        </Row>
+                    </Row>
+
+                    {stratData.contentPillars && (
+                        <div style={{ display: 'flex', gap: '12px', marginBottom: '35px', overflowX: 'auto', paddingBottom: '10px' }}>
+                            {stratData.contentPillars.map((p, i) => (
+                                <div key={i} style={{ 
+                                    background: 'var(--surfaceUp)', border: '1px solid var(--cyan)44', borderRadius: '100px', 
+                                    padding: '8px 18px', color: 'var(--cyan)', fontSize: '11px', fontWeight: 700, whiteSpace: 'nowrap'
+                                }}>
+                                    # {p.toUpperCase()}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                        {stratData.reelConcepts?.map((reel, i) => (
+                            <Card key={i} style={{ 
+                                borderLeft: `5px solid var(--green)`, 
+                                background: 'linear-gradient(90deg, rgba(0, 255, 157, 0.03) 0%, var(--surfaceUp) 100%)',
+                                transition: 'transform 0.2s'
+                            }} className="concept-card">
+                                <Row justify="space-between" align="flex-start">
+                                    <div style={{ flex: 1 }}>
+                                        <Row gap="12px" style={{ marginBottom: '15px' }}>
+                                            <span style={{ color: 'var(--dim)', fontWeight: 800, fontSize: '18px' }}>{(i + 1).toString().padStart(2, '0')}</span>
+                                            <Badge color="var(--cyan)">{reel.angle}</Badge>
+                                            <Badge color="var(--purple)">{reel.bucket}</Badge>
+                                            {reel.cta && <Badge color="var(--amber)">CTA: {reel.cta}</Badge>}
+                                        </Row>
+                                        <h3 style={{ fontSize: '18px', marginBottom: '12px', color: 'var(--text)', fontWeight: 700, lineHeight: '1.4' }}>"{reel.hook}"</h3>
+                                        <p style={{ color: 'var(--muted)', fontSize: '12px', lineHeight: '1.7', maxWidth: '800px' }}>{reel.outline}</p>
+                                    </div>
+                                    <div style={{ textAlign: 'right', marginLeft: '30px', minWidth: '120px' }}>
+                                        <Label>Viral Probability</Label>
+                                        <div style={{ fontSize: '36px', fontWeight: 900, color: 'var(--green)', letterSpacing: '-2px' }}>{reel.viralProbability}%</div>
+                                        <button className="btn-save" style={{
+                                            marginTop: '15px',
+                                            background: 'rgba(255,255,255,0.05)',
+                                            border: '1px solid var(--border)',
+                                            borderRadius: '6px',
+                                            padding: '8px 15px',
+                                            color: 'var(--muted)',
+                                            fontSize: '10px',
+                                            fontWeight: 700,
+                                            cursor: 'pointer',
+                                            width: '100%'
+                                        }}>+ SAVE AS DRAFT</button>
+                                    </div>
+                                </Row>
+                            </Card>
+                        ))}
+                    </div>
+
+                    {stratData.seriesConcepts && (
+                        <div style={{ marginTop: '40px' }}>
+                            <Card style={{ border: '1px solid var(--purple)44', background: 'rgba(168, 85, 247, 0.05)' }}>
+                                <Label style={{ color: 'var(--purple)' }}>Long-form Series Opportunities</Label>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginTop: '15px' }}>
+                                    {stratData.seriesConcepts.map((s, i) => (
+                                        <div key={i} style={{ fontSize: '13px', color: 'var(--text)', padding: '12px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                            <span style={{ color: 'var(--purple)', marginRight: '10px' }}>▶</span> {s}
+                                        </div>
+                                    ))}
+                                </div>
+                            </Card>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const Export = ({ reelInput, agentStates }) => {
+            const doneCount = Object.values(agentStates).filter(s => s.state === 'done').length;
+
+            const download = (filename, content, type = 'text/plain') => {
+                const blob = new Blob([content], { type });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                a.click();
+                URL.revokeObjectURL(url);
+            };
+
+            const exportFullJSON = () => {
+                const data = {
+                    generatedAt: new Date().toISOString(),
+                    reelInput,
+                    agentOutputs: Object.fromEntries(
+                        Object.entries(agentStates).map(([id, s]) => [id, s.data])
+                    )
+                };
+                download('ReelOS-Full-Research.json', JSON.stringify(data, null, 2), 'application/json');
+            };
+
+            const exportMarkdown = () => {
+                let md = `# ReelOS Research Export\nGenerated: ${new Date().toLocaleString()}\n\n`;
+                md += `## Input Context\n\`\`\`\n${reelInput}\n\`\`\`\n\n`;
+                
+                AGENT_DEFS.forEach(agent => {
+                    const data = agentStates[agent.id]?.data;
+                    if (data) {
+                        md += `## ${agent.name}\n> ${data.topInsight}\n\n`;
+                        Object.entries(data).forEach(([key, val]) => {
+                            if (key === 'topInsight') return;
+                            md += `### ${key}\n`;
+                            if (Array.isArray(val)) {
+                                val.forEach(v => md += `- ${v}\n`);
+                            } else if (typeof val === 'object') {
+                                Object.entries(val).forEach(([k, v]) => md += `- **${k}**: ${v}\n`);
+                            } else {
+                                md += `${val}\n`;
+                            }
+                            md += `\n`;
+                        });
+                    }
+                });
+                download('ReelOS-Research.md', md, 'text/markdown');
+            };
+
+            const exports = [
+                { title: 'Full Research JSON', desc: 'All agent outputs + input context', icon: '{ }', color: 'var(--cyan)', action: exportFullJSON },
+                { title: 'Strategy Markdown', desc: 'Human-readable research report', icon: '≡', color: 'var(--green)', action: exportMarkdown },
+                { 
+                    title: 'Hook Swipe Bank', desc: 'All hook templates extracted', icon: '⚡', color: 'var(--amber)', 
+                    action: () => {
+                        const hooks = agentStates.hook?.data?.hookSwipeBank || [];
+                        download('ReelOS-HookBank.txt', hooks.join('\n\n'));
+                    },
+                    disabled: !agentStates.hook?.data
+                },
+                { 
+                    title: 'Content Gaps Report', desc: 'Opportunity map from Gap Agent', icon: '🎯', color: 'var(--purple)', 
+                    action: () => download('ReelOS-Gaps.json', JSON.stringify(agentStates.gap?.data, null, 2), 'application/json'),
+                    disabled: !agentStates.gap?.data
+                },
+                { 
+                    title: '30 Reel Concepts', desc: 'Strategy agent recommendations', icon: '✦', color: 'var(--orange)', 
+                    action: () => download('ReelOS-Concepts.json', JSON.stringify(agentStates.strategy?.data, null, 2), 'application/json'),
+                    disabled: !agentStates.strategy?.data
+                },
+                { 
+                    title: 'Competitor Map', desc: 'Competitor intel agent findings', icon: '🔍', color: 'var(--red)', 
+                    action: () => download('ReelOS-Competitor.json', JSON.stringify(agentStates.competitor?.data, null, 2), 'application/json'),
+                    disabled: !agentStates.competitor?.data
+                }
+            ];
+
+            return (
+                <div>
+                    <Label>Archive Center</Label>
+                    <h1 style={{ fontSize: '24px', fontWeight: 800, marginBottom: '30px' }}>Export Research Assets</h1>
+
+                    {doneCount === 0 && (
+                        <Card style={{ marginBottom: '30px', border: '1px solid var(--amber)44', background: 'rgba(255, 184, 0, 0.05)' }}>
+                            <Row gap="20px">
+                                <span style={{ fontSize: '32px' }}>⚠</span>
+                                <div>
+                                    <div style={{ fontWeight: 800, fontSize: '15px' }}>Data Export Locked</div>
+                                    <div style={{ color: 'var(--muted)', fontSize: '12px', marginTop: '4px' }}>Agents must complete analysis before research files can be generated for download.</div>
+                                </div>
+                            </Row>
+                        </Card>
+                    )}
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '25px' }}>
+                        {exports.map((exp, i) => (
+                            <Card key={i} style={{ 
+                                opacity: exp.disabled ? 0.4 : 1,
+                                cursor: exp.disabled ? 'not-allowed' : 'default',
+                                transition: 'all 0.3s',
+                                border: `1px solid ${exp.disabled ? 'var(--border)' : exp.color + '33'}`
+                            }}>
+                                <div style={{ fontSize: '32px', color: exp.color, marginBottom: '20px' }}>{exp.icon}</div>
+                                <h3 style={{ fontSize: '16px', marginBottom: '8px', fontWeight: 700 }}>{exp.title}</h3>
+                                <p style={{ color: 'var(--muted)', fontSize: '11px', marginBottom: '25px', height: '40px', lineHeight: '1.5' }}>{exp.desc}</p>
+                                <Btn ghost color={exp.color} onClick={exp.action} disabled={exp.disabled || doneCount === 0} style={{ width: '100%', padding: '10px' }}>Download Asset</Btn>
+                            </Card>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
