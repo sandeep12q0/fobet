@@ -34,11 +34,12 @@ import { AGENT_DEFS } from '../lib/constants';
 
 export default function InsightsBoard({ agentStates }: any) {
 	const [expandedRun, setExpandedRun] = useState<string | null>(null);
+	const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
 	const { data: runs = [], isLoading: runsLoading } = useQuery({
 		queryKey: ['runs'],
 		queryFn: async () => {
-			const res = await fetch('http://localhost:5000/api/runs');
+			const res = await fetch(`${BACKEND_URL}/api/runs`);
 			if (!res.ok) throw new Error('Failed to fetch runs');
 			return res.json();
 		},
@@ -191,12 +192,11 @@ export default function InsightsBoard({ agentStates }: any) {
 }
 
 function RunInsightGroup({ run, isExpanded, onToggle }: any) {
+	const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 	const { data: analysis, isLoading: analysisLoading } = useQuery({
 		queryKey: ['analysis', run._id],
 		queryFn: async () => {
-			const res = await fetch(
-				`http://localhost:5000/api/runs/${run._id}/analysis`,
-			);
+			const res = await fetch(`${BACKEND_URL}/api/runs/${run._id}/analysis`);
 			return res.json();
 		},
 		enabled: isExpanded,
@@ -205,9 +205,7 @@ function RunInsightGroup({ run, isExpanded, onToggle }: any) {
 	const { data: reels = [], isLoading: reelsLoading } = useQuery({
 		queryKey: ['reels', run._id],
 		queryFn: async () => {
-			const res = await fetch(
-				`http://localhost:5000/api/runs/${run._id}/reels`,
-			);
+			const res = await fetch(`${BACKEND_URL}/api/runs/${run._id}/reels`);
 			return res.json();
 		},
 		enabled: isExpanded,

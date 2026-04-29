@@ -37,6 +37,7 @@ import {
 const APIFY_API_KEY = import.meta.env.VITE_APIFY_API_KEY;
 const APIFY_ACTOR_ID = import.meta.env.VITE_APIFY_ACTOR_ID;
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
 export default function App() {
 	const navigate = useNavigate();
@@ -75,7 +76,7 @@ export default function App() {
 
 			// 1. Create local run
 			try {
-				const lRunRes = await fetch('http://localhost:5000/api/runs', {
+				const lRunRes = await fetch(`${BACKEND_URL}/api/runs`, {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({
@@ -130,7 +131,7 @@ export default function App() {
 
 			// 4. Save to local backend
 			if (localRunId) {
-				await fetch(`http://localhost:5000/api/runs/${localRunId}/reels`, {
+				await fetch(`${BACKEND_URL}/api/runs/${localRunId}/reels`, {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({ reels: items }),

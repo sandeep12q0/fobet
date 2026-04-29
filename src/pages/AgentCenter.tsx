@@ -30,12 +30,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AGENT_DEFS } from '../lib/constants';
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
 const OMEGA_X_CONFIG = {
 	system_name: 'VIRALOS OMEGA X',
 	version: '3.1',
 	system_prompt:
 		'You are VIRALOS OMEGA X v3.1 — a viral content intelligence operating system grounded in behavioral psychology, adaptive learning, and anti-hallucination reasoning. You receive an array of content posts (1 to N). Analyze ALL posts together. Return ONE unified JSON object only. No markdown. No preamble. No explanation outside the JSON.',
+
 	core_rules: [
 		'Every recommendation must cite a psychological mechanism or observable signal.',
 		'Label uncertainty: [OBSERVED], [INFERRED], or [PREDICTED] — never fabricate.',
@@ -43,6 +45,7 @@ const OMEGA_X_CONFIG = {
 		'Never output generic advice. Ground every string in the input data.',
 		'Return only valid JSON matching the output schema exactly.',
 	],
+
 	psychology_stack: [
 		'Zeigarnik Effect',
 		'Pattern Recognition Betrayal',
@@ -53,16 +56,88 @@ const OMEGA_X_CONFIG = {
 		'Tribal Signaling',
 		'Contrast Effect',
 	],
-	output_schema: {
-		hooks: 'string[]',
-		retensionAnal: 'string[]',
-		topicGapMap: 'string[]',
-		patternRecogonition: 'string[]',
-		competitorIntelAnal: 'string[]',
-		contentStrategy: 'string[]',
-		importantHastags: 'string[]',
-		importantKeywords: 'string[]',
+
+	input_schema: {
+		type: 'array',
+		items: {
+			caption: 'string (optional)',
+			hashtags: 'string[] (optional)',
+			mentions: 'string[] (optional)',
+			commentsCount: 'number (optional)',
+			likesCount: 'number (optional)',
+			videoViewCount: 'number (optional)',
+			videoPlayCount: 'number (optional)',
+			transcript: 'string (optional)',
+		},
 	},
+
+	engines: {
+		opportunity_engine: {
+			tasks: [
+				'Extract engagement signals from metrics (likes/views ratio, play/view ratio)',
+				'Find whitespace: topics present in transcripts but absent in hashtags',
+				'Generate contrarian angles on the dominant content theme',
+				'Score top opportunities on novelty, demand, and virality fit',
+				'Populate topicGapMap and competitorIntelAnal from findings',
+			],
+		},
+		content_engine: {
+			tasks: [
+				'Select strongest psychology trigger per hook',
+				'Generate 6–8 hooks, each labeled with its trigger from psychology_stack',
+				"Format: '[TriggerName] Hook text here'",
+				'Populate retensionAnal from play/view ratios and transcript pacing signals',
+				'Populate patternRecogonition from cross-post signal patterns',
+			],
+		},
+		innovation_lab: {
+			tasks: [
+				'Identify underused content formats from the input',
+				'Generate contrarian or breakout content angles',
+				'Stress test each angle: scroll-stop, shareability, retention, scalability',
+				'Feed findings into contentStrategy',
+			],
+		},
+		adaptive_learning_engine: {
+			tasks: [
+				'If metrics exist: rank posts by engagement rate (likes/views), detect what highest performers share',
+				'If metrics absent: generate [PREDICTED] benchmarks from content signals',
+				'Extract winning hooks, formats, and topic patterns',
+				'Reduce weak patterns from low-performing posts',
+				'Feed all learnings into contentStrategy and patternRecogonition',
+			],
+		},
+		anti_hallucination_firewall: {
+			rules: [
+				'No invented signals',
+				'No generic pains not present in input',
+				'No unsupported confidence scores',
+				'Flag every uncertain claim with [INFERRED] or [PREDICTED]',
+				'All hashtags must come from input or be directly derivable from content themes',
+			],
+		},
+	},
+
+	output_schema: {
+		hooks: 'string[] — 6–8 hooks, each prefixed with [PsychTrigger]',
+		retensionAnal:
+			'string[] — 3–5 retention observations with metric reasoning or [PREDICTED] labels',
+		topicGapMap:
+			'string[] — 3–5 underserved topic angles not covered by current content',
+		patternRecogonition:
+			'string[] — 3–5 cross-post patterns with signal source cited',
+		competitorIntelAnal:
+			'string[] — 3–5 competitive insights inferred from mentions and hashtag landscape',
+		contentStrategy:
+			'string[] — 5–7 specific next-action recommendations grounded in findings',
+		importantHastags:
+			'string[] — 5–10 high-leverage hashtags with rationale appended after colon',
+		importantKeywords:
+			'string[] — 5–10 high-leverage keywords/phrases with psychological or SEO rationale appended after colon',
+	},
+
+	user_instruction:
+		'Run full VIRALOS OMEGA X v3.1 pipeline using all engines on the provided input array. Apply adaptive learning, anti-hallucination firewall, and psychology stack at every step. Return ONE valid JSON object matching output_schema exactly. No markdown. No extra text.',
 };
 
 export default function AgentCenter({ agentStates, runAgent, reelInput }: any) {
@@ -72,7 +147,7 @@ export default function AgentCenter({ agentStates, runAgent, reelInput }: any) {
 	const { data: runs = [] } = useQuery({
 		queryKey: ['runs'],
 		queryFn: async () => {
-			const res = await fetch('http://localhost:5000/api/runs');
+			const res = await fetch(`${BACKEND_URL}/api/runs`);
 			return res.json();
 		},
 	});
@@ -81,7 +156,7 @@ export default function AgentCenter({ agentStates, runAgent, reelInput }: any) {
 		queryKey: ['analysis', selectedRunId],
 		queryFn: async () => {
 			const res = await fetch(
-				`http://localhost:5000/api/runs/${selectedRunId}/analysis`,
+				`${BACKEND_URL}/api/runs/${selectedRunId}/analysis`,
 			);
 			return res.json();
 		},
@@ -90,9 +165,7 @@ export default function AgentCenter({ agentStates, runAgent, reelInput }: any) {
 
 	const omegaMutation = useMutation({
 		mutationFn: async (runId: string) => {
-			const reelsRes = await fetch(
-				`http://localhost:5000/api/runs/${runId}/reels`,
-			);
+			const reelsRes = await fetch(`${BACKEND_URL}/api/runs/${runId}/reels`);
 			const reels = await reelsRes.json();
 
 			const aiInput = reels.map((r: any) => ({
@@ -106,6 +179,28 @@ export default function AgentCenter({ agentStates, runAgent, reelInput }: any) {
 				transcript: r.transcript,
 			}));
 
+			const fullPrompt = `
+${OMEGA_X_CONFIG.system_prompt}
+
+CORE RULES:
+${OMEGA_X_CONFIG.core_rules.join('\n')}
+
+PSYCHOLOGY STACK:
+${OMEGA_X_CONFIG.psychology_stack.join(', ')}
+
+ENGINES & PIPELINES:
+${JSON.stringify(OMEGA_X_CONFIG.engines, null, 2)}
+
+OUTPUT SCHEMA (STRICTLY ADHERE TO THIS):
+${JSON.stringify(OMEGA_X_CONFIG.output_schema, null, 2)}
+
+USER INSTRUCTION:
+${OMEGA_X_CONFIG.user_instruction}
+
+INPUT DATA:
+${JSON.stringify(aiInput, null, 2)}
+`;
+
 			const response = await fetch(
 				`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
 				{
@@ -116,21 +211,35 @@ export default function AgentCenter({ agentStates, runAgent, reelInput }: any) {
 							{
 								parts: [
 									{
-										text: `${JSON.stringify(OMEGA_X_CONFIG.system_prompt)}\n\nINPUT DATA:\n${JSON.stringify(aiInput)}`,
+										text: fullPrompt,
 									},
 								],
 							},
 						],
-						generationConfig: { response_mime_type: 'application/json' },
+						generationConfig: {
+							response_mime_type: 'application/json',
+						},
 					}),
 				},
 			);
 
 			const data = await response.json();
-			const rawResult = data.candidates[0].content.parts[0].text;
+			if (!data.candidates?.[0]?.content?.parts?.[0]?.text) {
+				throw new Error('Invalid AI response structure');
+			}
+
+			let rawResult = data.candidates[0].content.parts[0].text;
+
+			// Handle potential markdown wrapping
+			if (rawResult.includes('```json')) {
+				rawResult = rawResult.split('```json')[1].split('```')[0].trim();
+			} else if (rawResult.includes('```')) {
+				rawResult = rawResult.split('```')[1].split('```')[0].trim();
+			}
+
 			const result = JSON.parse(rawResult);
 
-			await fetch(`http://localhost:5000/api/runs/${runId}/analysis`, {
+			await fetch(`${BACKEND_URL}/api/runs/${runId}/analysis`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(result),
